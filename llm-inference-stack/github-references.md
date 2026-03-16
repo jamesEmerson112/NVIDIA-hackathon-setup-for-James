@@ -27,6 +27,14 @@ Repos for the tools discussed in our inference stack notes.
 - **Megatron-LM** — https://github.com/NVIDIA/Megatron-LM
 - **DeepSpeed** — https://github.com/microsoft/DeepSpeed
 
+## Hosted Inference (No GPU Required)
+- **NVIDIA NIM API / build.nvidia.com** — https://build.nvidia.com (free API access to Nemotron and other models)
+- **OpenRouter** (free Nemotron tier) — https://openrouter.ai
+
+## Serverless GPU Platforms
+- **Modal** — https://modal.com (first-class vLLM support, $30/mo free credits)
+- **RunPod Serverless** — https://www.runpod.io/serverless-gpu (vLLM templates, pay-per-second)
+
 ## Related / Mentioned
 - **CUTLASS** (NVIDIA GPU kernel templates) — https://github.com/NVIDIA/cutlass
 - **Hugging Face Transformers** — https://github.com/huggingface/transformers

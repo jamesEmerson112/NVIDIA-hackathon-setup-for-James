@@ -34,19 +34,36 @@ Unsloth → weights → Dynamo → SGLang/vLLM across cluster → users
 
 ## Layer-by-Layer Breakdown
 
+> **Note:** Dynamo *wraps* the inference engines — it's not a separate layer sitting on top. FlashInfer is *inside* SGLang (default) and vLLM (optional), not a standalone layer you configure separately.
+
 ```
-┌─────────────────────────────────────────────────┐
-│           NVIDIA Dynamo (orchestration)          │  ← Distributed serving framework
-│         Routes requests, manages clusters        │     (the "traffic controller")
-├─────────────────────────────────────────────────┤
-│     SGLang  │   vLLM   │  TensorRT-LLM          │  ← Inference engines
-│            (the "cars")                          │     (scheduling, batching, API)
-├─────────────────────────────────────────────────┤
-│              FlashInfer (kernels)                 │  ← GPU kernel library
-│            (the "engine parts")                  │     (raw GPU compute)
-├─────────────────────────────────────────────────┤
-│              NVIDIA GPU Hardware                 │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  MODEL WEIGHTS                                       │
+│  (Nemotron, Llama, DeepSeek, Qwen, etc.)             │
+└──────────────────────┬───────────────────────────────┘
+                       │  loaded into
+                       ▼
+┌──────────────────────────────────────────────────────┐
+│              NVIDIA Dynamo (orchestration)            │
+│         Routes requests, manages clusters            │
+│         Skip for single-GPU deployments              │
+│                                                      │
+│  ┌────────────────────────────────────────────────┐  │
+│  │  Backend engine (you pick one at launch):      │  │
+│  │                                                │  │
+│  │  SGLang         │  vLLM      │  TensorRT-LLM   │  │
+│  │  (FlashInfer    │ (own       │  (NVIDIA's       │  │
+│  │   built-in)     │  kernels,  │   compiled       │  │
+│  │                 │  FlashInfer│   engine)         │  │
+│  │                 │  optional) │                   │  │
+│  └────────────────────────────┬───────────────────┘  │
+└───────────────────────────────┼──────────────────────┘
+                                ▼
+┌──────────────────────────────────────────────────────┐
+│              NVIDIA GPU Hardware                     │
+│  T4 (Turing) → A100 (Ampere) → H100 (Hopper)       │
+│                                → B200 (Blackwell)    │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -127,7 +144,9 @@ Announced at GTC 2025. The orchestration layer for multi-node inference.
 ## Key Relationships
 
 - **NVIDIA contributes kernels to FlashInfer** — strategy to get optimized code into the open-source ecosystem
-- **SGLang + FlashInfer** — tightly coupled, co-developed (UC Berkeley), ~29% faster than vLLM on benchmarks
+- **SGLang + FlashInfer** — tightly coupled, co-developed (UC Berkeley), ~29% faster than vLLM on benchmarks. FlashInfer is SGLang's default kernel backend.
 - **vLLM + FlashInfer** — optional backend, vLLM also has its own PagedAttention
-- **Dynamo** doesn't use FlashInfer directly — it orchestrates engines that use FlashInfer internally
+- **Dynamo wraps the engines** — ships with SGLang, vLLM, and TensorRT-LLM as built-in backends. You pick one at launch (`python3 -m dynamo.sglang` or `python3 -m dynamo.vllm`). Dynamo manages lifecycle, routing, and distributed KV cache while the engine handles inference natively.
+- **SGLang vs vLLM** — a workload-pattern decision. SGLang uses RadixAttention (shares common prefixes across requests). vLLM uses PagedAttention (efficient per-request memory). Most apps with shared system prompts lean SGLang.
+- **Nemotron** — NVIDIA's open model family. It's a model choice (like Llama or DeepSeek), not part of the serving stack. Loads into any engine.
 - **Unsloth** is complementary to all of the above — it produces the weights they serve
